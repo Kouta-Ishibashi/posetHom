@@ -1,0 +1,1458 @@
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @file Z2matrix.h
+///
+/// This file contains classes and functions related to Z2-matrix.
+///
+/// Most of this file is inherited from the CHomP library:written by Pawel Pilarczyk.
+/// http://chomp.rutgers.edu/Projects/Computational_Homology/OriginalCHomP/software/
+/// Classes Z2matrix and simplelist are from 'chain.h'.the class auto_array is from 'autoarray.h'.
+/// Some functions (especially concerned with whitney class) in class Z2matirix are original ones.
+///
+/////////////////////////////////////////////////////////////////////////////
+
+// Copyright (C) 2015-2016 by Kota Ishibashi
+//
+// This file is part of the Homology Library.  This library is free software;
+// you can redistribute it and/or modify it under the terms of the GNU
+// General Public License as published by the Free Software Foundation;
+// either version 2 of the License, or (at your option) any later version.
+//
+// This library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License along
+// with this software; see the file "license.txt".  If not, write to the
+// Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
+// MA 02111-1307, USA.
+
+// Started in 2015. Last revision: January 29, 2016.
+
+
+#ifndef Z2MATRIX_H
+#define Z2MATRIX_H
+
+
+#include <iostream>
+#include <fstream>
+#include <cstdlib>
+#include <iomanip>
+#include <algorithm>
+#include <sstream>
+#include "poset_convert.h"
+class simplelist;
+class auto_array;
+class Z2matrix;
+
+// --------------------------------------------------
+// ------------------- simplelist -------------------
+// --------------------------------------------------
+
+/// This class defines a simple list of pointers to objects
+/// of the given type. It is a helper class used in chain complex.
+class simplelist
+{
+public:
+	/// The default constructor of an empty list.
+	simplelist ();
+
+	/// The destructor.
+	~simplelist ();
+
+	/// Adds an element to the list.
+	void add (Z2matrix &m);
+
+	/// Remove an element from the list.
+	void remove (Z2matrix &m);
+
+	/// A simple internal iterator of the list. A call to this function
+	/// returns an element from the list, but does not remove it from the
+	/// list, and sets the internal iterator for the next element.
+	/// After the last element has been taken, returns 0 and rewinds
+	/// the iterator to the beginning of the list.
+	Z2matrix *take ();
+
+private:
+	/// The copy constructor is not implemented.
+	simplelist (const simplelist &s)
+	{
+		throw "Copying constructor not implemented "
+			"for a simple list.";
+		return;
+	}
+
+	/// The assignment operator is not implemented.
+	simplelist &operator = (const simplelist &s)
+	{
+		throw "Operator = not implemented "
+			"for a simple list.";
+		return *this;
+	}
+
+	/// The number of element pointers stored in the list.
+	int num;
+
+	/// The current element in the table.
+	int cur;
+
+	/// A table of element pointers.
+	Z2matrix **elem;
+
+}; /* class simplelist */
+
+// --------------------------------------------------
+
+
+inline simplelist::simplelist (): num (0), cur (0), elem (NULL)
+{
+	return;
+} /* simplelist::simplelist */
+
+inline simplelist::~simplelist ()
+{
+	if (elem)
+		delete [] elem;
+	return;
+} /* simplelist::~simplelist */
+
+inline void simplelist::add (Z2matrix &m)
+{
+	Z2matrix **newelem = new Z2matrix * [num + 1];
+	for (int i = 0; i < num; ++ i)
+		newelem [i] = elem [i];
+	newelem [num ++] = &m;
+	delete [] elem;
+	elem = newelem;
+	return;
+} /* simplelist::add */
+
+inline void simplelist::remove (Z2matrix &m)
+{
+	int pos = 0;
+	while ((pos < num) && (elem [pos] != &m))
+		++ pos;
+	-- num;
+	while (pos < num)
+	{
+		elem [pos] = elem [pos + 1];
+		++ pos;
+	}
+	return;
+} /* simplelist::remove */
+
+inline Z2matrix *simplelist::take ()
+{
+	if (cur >= num)
+	{
+		cur = 0;
+		return NULL;
+	}
+	else
+	{
+		return elem [cur ++];
+	}
+} /* simplelist::take */
+
+
+class auto_array
+{
+private:
+	chain *ptr;
+
+public:
+	/* /// The type of the elements in the array. */
+	/* typedef T chain; */
+
+	/// The constructor.
+	explicit auto_array (chain *p = 0) throw (): ptr (p) {}
+
+	/// Copy constructor.
+	auto_array (auto_array &a) throw (): ptr (a. release ()) {}
+
+	/// Assignment operator.
+	auto_array &operator = (auto_array &a) throw ()
+	{
+		reset (a. release ());
+		return *this;
+	}
+
+	/// The destructor.
+	~auto_array ()
+	{
+		if (ptr)
+			delete [] ptr;
+		return;
+	}
+
+	/// Returns the internally stored pointer to an array.
+	chain *get () const throw ()
+	{
+		return ptr;
+	}
+
+	/// Releases the pointer and returns it.
+	chain *release () throw ()
+	{
+		chain *tmp = ptr;
+		ptr = 0;
+		return tmp;
+	}
+
+	/// Resets the object to hold another pointer.
+	void reset (chain *p = 0) throw ()
+	{
+		if (p != ptr)
+		{
+			if (ptr)
+				delete [] ptr;
+			ptr = p;
+		}
+	}
+
+};
+/* class auto_array */
+
+
+// --------------------------------------------------
+// -------------------- Z2matrix ---------------------
+// --------------------------------------------------
+
+/// A class for representing sparse matrices containing elements
+/// of the 'euclidom' type. This class has very specific functionality
+/// to be used mainly for the purpose of homology computation.
+
+
+class Z2matrix
+{
+public:
+	/// The default constructor.
+	Z2matrix ();
+	/// The copy constructor
+	Z2matrix (const Z2matrix &m);
+	/// The assignment operator.
+	Z2matrix &operator = (const Z2matrix &s);
+
+	/// The destructor of a matrix.
+	~Z2matrix ();
+
+	/// Defines the number of rows and columns
+        /// and increases the internal tables if necessary.
+	/// Useful for creating large zero matrices.
+	void define (int numrows, int numcols);
+
+	/// Defines the identity matrix of the given size.
+	void identity (int size);
+
+	/// Adds a value to (row,col) element of the matrix.
+	void add (int row, int col, const Z2integer &e);
+
+	/// Returns the value at the desired elem of the matrix.
+	/// If 'row' or 'col' is -1, gets the first element
+	/// in it or returns 0 if the colum/row is empty.
+	Z2integer get (int row, int col) const;
+
+	/// Returns a reference to the entire row stored as a chain.
+	const chain &getrow (int n) const;
+
+	/// Returns a reference to the entire column stored as a chain.
+	const chain &getcol (int n) const;
+
+	/// Returns the number of rows in the matrix.
+	int getnrows () const;
+
+	/// Returns the number of columns in the matrix.
+	int getncols () const;
+
+	/// Adds one row to another with a given coefficient.
+	/// Updates all the matrices which are linked to this one.
+	void addrow (int dest, int source, const Z2integer &e);
+
+	/// Adds one column to another with a given coefficient.
+	/// Updates all the matrices which are linked to this one.
+	void addcol (int dest, int source, const Z2integer &e);
+
+	/// Swaps two rows of the matrix.
+	/// Updates all the matrices which are linked to this one.
+	void swaprows (int i, int j);
+
+	/// Swaps two columns of the matrix.
+	/// Updates all the matrices which are linked to this one.
+	void swapcols (int i, int j);
+
+	 /// Multiplies the row by the given coefficient and updates columns.
+	void multiplyrow (int n, const Z2integer &e);
+
+	/// Multiplies the column by the given coefficient and updates rows.
+	void multiplycol (int n, const Z2integer &e);
+
+	/// Finds a row containing at least the required number of nonzero
+	/// elements, starting at the given row.
+	/// If 'req_elements' is set to -1 then looks for a zero row.
+	/// Returns the number of the row satisfying the desired property,
+	/// or -1 if not found.
+        int findrow (int req_elements = 1, int start = -1) const;
+
+	/// Finds a column containing at least the required number of nonzero
+	/// elements, starting at the given column.
+	/// If 'req_elements' is set to -1 then looks for a zero column.
+	/// Returns the number of the column satisfying the desired property,
+	/// or -1 if not found.
+	int findcol (int req_elements = 1, int start = -1) const;
+
+        //Finds the row index of lowest one in column j;
+        int low(int j);
+
+	/// Reduces the given row of the matrix and updates its columns.
+	/// A preferred number of a column to leave is given.
+	/// Updates all the matrices which are linked to this one.
+	/// Returns the number of the column to be reduced next,
+	/// or -1 if done.
+        int reducerow (int n, int preferred);
+
+	/// Reduces the given column of the matrix and updates its rows.
+	/// A preferred number of a row to leave is given.
+	/// Updates all the matrices which are linked to this one.
+	/// Returns the number of the row to be reduced next,
+	/// or -1 if done.
+	int reducecol (int n, int preferred);
+
+
+	/// Inverts the matrix. Throws an error message on failure.
+	void invert (void);
+
+	/// Computes the product of the two given matrices.
+	/// The matrix is replaced with the product.
+	void multiply (const Z2matrix &m1,const Z2matrix &m2);
+
+
+        void showAsMatrix(Z2matrix m);
+        Z2matrix action (Z2matrix m,chain c);
+        // make the form R = d*V
+        // R and d code the infomation of homology and its generator.
+        void reduceBoundary (Z2matrix &boundray,Z2matrix &v);
+
+        int minInd(Z2matrix boundary,int j);
+
+        /*
+          input : simpleces list
+          return: boundarymatrix
+        */
+        Z2matrix makeBoundaryMatrix(std::vector<std::vector<int>> simpleces);
+        /*
+          input : filename
+          return: boudarymatrix
+         */
+        //        Z2matrix makeBoundaryMatrixFromPosetFile(std::string filename);
+        int lowestNum(std::vector<std::vector<int>> simpleces,Z2matrix reducedBoundary,int p);
+        std::vector<int> lowestIndexList(std::vector<std::vector<int>> simpleces,Z2matrix reducedBoundary,int p);
+        int zero(std::vector<std::vector<int>> simpleces,Z2matrix reducedBoundary,int p);
+        void showHomology(Z2matrix reducedBoundary, std::vector<std::vector<int>> simpleces);
+
+        void showHomologyGenerator(Z2matrix reducedBoundary, Z2matrix basisChange, std::vector<std::vector<int>> simpleces,std::vector<int> &generatorIndexList);
+
+        int findlowCol(Z2matrix matrix,int n);
+
+        void detectWhitneyClass(chain &whitneychain, Z2matrix image,const std::vector<int> generatorIndexList);
+
+        void showWhitneyClass(chain whitneychain, /* Z2matrix basechange, */std::vector<std::vector<int>> simpleces,std::vector<int> generatorIndexList);
+        /* void showWhitneyAsHomGen(std::vector<chain> chainList,std::vector<int> generatorIndexList); */
+	/// This is a list of matrices to be updated together with the
+	/// changes to the columns or rows of the current matrix.
+	/// These matrices may have these spaces as their domains or
+	/// ranges (codomains, images).
+	/// For instance, "dom_img" is a list of matrices such that the
+	/// domain of the current matrix is the image of each of them.
+	simplelist dom_dom, dom_img, img_dom,img_img;
+
+
+        /* --- show member functions ---*/
+
+	/// Writes the matrix to an output stream by its rows or columns.
+	outputstream &showrowscols (outputstream &out,
+		chain *table, int tablen,
+		int first = 0, int howmany = 0,
+		const char *label = NULL) const;
+
+	/// Writes the matrix to an output stream by its rows.
+	outputstream &showrows (outputstream &out, int first = 0,
+		int howmany = 0, const char *label = "Row ") const;
+
+	/// Writes the matrix to an output stream by its rows.
+	std::ostream &showrows (std::ostream &out, int first = 0,
+		int howmany = 0, const char *label = "Row ") const;
+
+	/// Writes the matrix to an output stream by its rows.
+	outputstream &showcols (outputstream &out, int first = 0,
+		int howmany = 0, const char *label = "Col ") const;
+
+	/// Writes the matrix to an output stream by its rows.
+	std::ostream &showcols (std::ostream &out, int first = 0,
+		int howmany = 0, const char *label = "Col ") const;
+
+
+private:
+	/// The number of rows in the matrix.
+	int nrows;
+
+	/// The number of columns in the matrix.
+	int ncols;
+
+	/// The number of allocated rows.
+	int allrows;
+
+	/// The number of allocated columns.
+	int allcols;
+
+	/// The rows of the matrix.
+	chain *rows;
+
+	/// The columns of the matrix.
+	chain *cols;
+
+	/// An internal procedure for both findrow and findcol.
+	/// The value of which is: row = 1, col = 0.
+	int findrowcol (int req_elements, int start, int which) const;
+
+	/// Increases tables to be enough to keep the given number of
+	/// columns and rows. This function does not set 'nrows' and 'ncols'.
+	void increase (int numrows, int numcols);
+
+	/// Increases tables to be enough to keep the given number of rows.
+	void increaserows (int numrows);
+
+	/// Increases tables to be enough to keep the given number of
+	/// columns.
+	void increasecols (int numcols);
+
+}; /* class Z2matrix */
+
+// --------------------------------------------------
+
+inline Z2matrix::Z2matrix (): nrows (0), ncols (0),
+	allrows (0), allcols (0), rows (NULL), cols (NULL)
+{
+	return;
+} /* Z2matrix::Z2matrix */
+
+
+inline Z2matrix::~Z2matrix ()
+{
+	if (rows)
+		delete [] rows;
+	if (cols)
+		delete [] cols;
+	return;
+} /* Z2matrix::~Z2matrix */
+
+
+inline void Z2matrix::define (int numrows, int numcols)
+{
+	// verify that no nonzero entry will be thrown away
+	if ((nrows > numrows) || (ncols > numcols))
+		throw "Trying to define a matrix smaller than it really is";
+
+	// increase the size of the matrix to fit the defined one
+	increase (numrows, numcols);
+
+	// set the number of rows and the number of columns as requested
+	nrows = numrows;
+	ncols = numcols;
+
+	return;
+} /* Z2matrix::define */
+
+inline Z2matrix::Z2matrix (const Z2matrix &m)
+{
+	nrows = m.nrows;
+	ncols = m.ncols;
+	allrows = m.allrows;
+	allcols = m.allcols;
+
+	rows = NULL;
+	cols = NULL;
+	if (m. allrows > 0)
+	{
+		chain *newrows = new chain [m. allrows];
+		if (!newrows)
+			throw "Not enough memory for matrix rows.";
+		for (int i = 0; i < m. allrows; ++ i)
+			newrows [i] = m. rows [i];
+		rows = newrows;
+	}
+
+	if (m. allcols > 0)
+	{
+		chain *newcols = new chain [m. allcols];
+		if (!newcols)
+			throw "Not enough memory for matrix columns.";
+		for (int i = 0; i < m.allcols; ++ i)
+			newcols [i] = m. cols [i];
+		cols = newcols;
+	}
+} /* Z2matrix::Z2matrix */
+
+inline Z2matrix &Z2matrix::operator =
+	(const Z2matrix &m)
+{
+	// first release allocated tables if any
+	if (rows)
+		delete [] rows;
+	if (cols)
+		delete [] cols;
+
+	nrows = m. nrows;
+	ncols = m. ncols;
+	allrows = m. allrows;
+	allcols = m. allcols;
+
+	rows = NULL;
+	cols = NULL;
+	if (m. allrows > 0)
+	{
+		chain *newrows = new chain [m. allrows];
+		if (!newrows)
+			throw "Not enough memory for matrix rows.";
+		for (int i = 0; i < m. allrows; ++ i)
+			newrows [i] = m. rows [i];
+		rows = newrows;
+	}
+
+	if (m. allcols > 0)
+	{
+		chain *newcols = new chain [m. allcols];
+		if (!newcols)
+			throw "Not enough memory for matrix columns.";
+		for (int i = 0; i < m.allcols; ++ i)
+			newcols [i] = m. cols [i];
+		cols = newcols;
+	}
+
+	return *this;
+} /* Z2matrix::operator = */
+
+inline void Z2matrix::identity (int size)
+{
+	if (!nrows && !ncols)
+		increase (size, size);
+	else if ((size > nrows) || (size > ncols))
+		size = (nrows < ncols) ? nrows : ncols;
+	for (int i = 0; i < size; ++ i)
+	{
+		Z2integer one;
+		one = 1;
+		add (i, i, one);
+	}
+	return;
+} /* Z2matrix::identity */
+
+
+inline void Z2matrix::add (int row, int col, const Z2integer &e)
+// A [r] [c] += e;
+{
+	if (row < 0)
+		throw "Incorrect row number.";
+	if (col < 0)
+		throw "Incorrect column number.";
+	if (row >= nrows)
+	{
+		if (row >= allrows)
+			increaserows (row + row / 2 + 1);
+		nrows = row + 1;
+	}
+	if (col >= ncols)
+	{
+		if (col >= allcols)
+			increasecols (col + col / 2 + 1);
+		ncols = col + 1;
+	}
+	if (e == 0)
+		return;
+	cols [col]. add (row, e);
+	rows [row]. add (col, e);
+	return;
+} /* Z2matrix::add */
+
+
+inline Z2integer Z2matrix::get (int row, int col) const
+// return (A [r] [c]);
+{
+	if ((row >= nrows) || (col >= ncols))
+	{
+		Z2integer zero;
+		zero = 0;
+		return zero;
+	}
+	if (row >= 0)
+		return rows [row]. getcoefficient (col);
+	else if (col >= 0)
+		return cols [col]. getcoefficient (row);
+	else
+	{
+		Z2integer zero;
+		zero = 0;
+		return zero;
+	}
+} /* Z2matrix::get */
+
+inline const chain &Z2matrix::getrow (int n) const
+{
+	if ((n < 0) || (n >= nrows))
+		throw "Incorrect row number.";
+	return rows [n];
+} /* Z2matrix::getrow */
+
+inline const chain &Z2matrix::getcol (int n) const
+{
+	if ((n < 0) || (n >= ncols))
+		throw "Incorrect column number.";
+	return cols [n];
+} /* Z2matrix::getcol */
+
+inline int Z2matrix::getnrows () const
+{
+	return nrows;
+} /* Z2matrix::getnrows */
+
+
+inline int Z2matrix::getncols () const
+{
+	return ncols;
+} /* Z2matrix::getncols */
+
+
+inline void Z2matrix::addrow (int dest, int source,
+	const Z2integer &e)
+{
+	// check if the parameters are not out of range
+	if ((dest < 0) || (dest >= nrows) || (source < 0) ||
+		(source >= nrows))
+		throw "Trying to add rows out of range.";
+
+	// add this row
+	rows [dest]. add (rows [source], e, dest, cols);
+
+	// update the other matrices
+	Z2matrix *m;
+	while ((m = img_img. take ()) != NULL)
+		if (m -> rows)
+			m -> rows [dest]. add (m -> rows [source], e,
+				dest, m -> cols);
+
+	while ((m = img_dom. take ()) != NULL)
+		if (m -> cols)
+			m -> cols [source]. add (m -> cols [dest], -e,
+				source, m -> rows);
+
+	return;
+} /* Z2matrix::addrow */
+
+
+inline void Z2matrix::addcol (int dest, int source,
+	const Z2integer &e)
+{
+	// check if the parameters are not out of range
+	if ((dest < 0) || (dest >= ncols) || (source < 0) ||
+		(source >= ncols))
+		throw "Trying to add columns out of range.";
+
+	// add this column
+	cols [dest]. add (cols [source], e, dest, rows);
+
+	// update the other matrices
+	Z2matrix *m;
+	while ((m = dom_dom. take ()) != NULL)
+		if (m -> cols)
+			m -> cols [dest]. add (m -> cols [source], e,
+				dest, m -> rows);
+
+	while ((m = dom_img. take ()) != NULL)
+		if (m -> rows)
+			m -> rows [source]. add (m -> rows [dest], -e,
+				source, m -> cols);
+
+	return;
+} /* Z2matrix::addcol */
+
+
+inline void Z2matrix::swaprows (int i, int j)
+{
+	// in the trivial case nothing needs to be done
+	if (i == j)
+		return;
+
+	// check if the parameters are not out of range
+	if ((i < 0) || (i >= nrows) || (j < 0) || (j >= nrows))
+		throw "Trying to swap rows out of range.";
+
+	// swap the rows
+	rows [i]. swap (rows [j], i, j, cols);
+
+	// update the other matrices
+	Z2matrix *m;
+	while ((m = img_img. take ()) != NULL)
+		if ((m -> rows) && (m -> nrows))
+			m -> rows [i]. swap (m -> rows [j], i, j, m -> cols);
+
+	while ((m = img_dom. take ()) != NULL)
+		if ((m -> cols) && (m -> ncols))
+			m -> cols [i]. swap (m -> cols [j], i, j, m -> rows);
+
+	return;
+} /* Z2matrix::swaprows */
+
+
+inline void Z2matrix::swapcols (int i, int j)
+{
+	// in the trivial case nothing needs to be done
+	if (i == j)
+		return;
+
+	// check if the parameters are not out of range
+	if ((i < 0) || (i >= ncols) || (j < 0) || (j >= ncols))
+		throw "Trying to swap cols out of range.";
+
+	// swap the columns
+	cols [i]. swap (cols [j], i, j, rows);
+
+	// update the other matrices
+	Z2matrix *m;
+	while ((m = dom_dom. take ()) != NULL)
+		if ((m -> cols) && (m -> ncols))
+			m -> cols [i]. swap (m -> cols [j], i, j, m -> rows);
+
+	while ((m = dom_img. take ()) != NULL)
+		if ((m -> rows) && (m -> nrows))
+			m -> rows [i]. swap (m -> rows [j], i, j, m -> cols);
+
+	return;
+} /* Z2matrix::swapcols */
+
+
+inline void Z2matrix::multiplyrow (int n, const Z2integer &e)
+{
+	// retrieve the row
+	chain &therow = rows [n];
+
+	// multiply the row
+	therow. multiply (e);
+
+	// multiply the corresponding entries in all the columns
+	for (int i = 0; i < therow. size (); ++ i)
+		cols [therow. num (i)]. multiply (e, n);
+
+	return;
+} /* Z2matrix::multiplyrow */
+
+
+inline void Z2matrix::multiplycol (int n, const Z2integer &e)
+{
+	// retrieve the row
+	chain &thecol = cols [n];
+
+	// multiply the row
+	thecol. multiply (e);
+
+	// multiply the corresponding entries in all the rows
+	for (int i = 0; i < thecol. size (); ++ i)
+		rows [thecol. num (i)]. multiply (e, n);
+
+	return;
+} /* Z2matrix::multiplycol */
+
+
+
+inline int Z2matrix::findrowcol (int req_elements, int start,
+	int which) const
+{
+	// start at the starting point
+	int i = start;
+	int random_i = -1;
+
+	// set loop to none
+	int loopcounter = 0;
+
+	// if a random start is requested, initialize it and set loop to 1
+	if (start < 0)
+	{
+		i = random_i = std::rand () % (which ? nrows : ncols);
+		loopcounter = 1;
+	}
+
+	// select some candidates
+	int candidate = -1;
+	int candidates_left = 3;
+
+	// if the table has one of its dimensions trivial, return the result
+	if (which ? !ncols : !nrows)
+		return (((req_elements > 0) ||
+			(i >= (which ? nrows : ncols))) ? -1 : i);
+
+	// while the current position has not gone beyond the table
+	while (i < (which ? nrows : ncols))
+	{
+		// if there is an appropriate row/column, return its number
+		int l = (which ? rows : cols) [i]. size ();
+		if ((req_elements >= 0) && (l >= req_elements))
+			return i;
+		else if ((req_elements < 0) && !l)
+		{
+			if (!candidates_left || !(which ? rows : cols) [i].
+				contains_non_invertible ())
+				return i;
+			else
+			{
+				candidate = i;
+				-- candidates_left;
+				if (start < 0)
+				{
+					random_i = std::rand () %
+						(which ? nrows : ncols);
+					i = random_i - 1;
+					loopcounter = 1;
+				}
+			}
+		}
+
+		// otherwise increase the counter and rewind to 0 if needed
+		if (++ i >= (which ? nrows : ncols))
+			if (loopcounter --)
+				i = 0;
+
+		// if the searching was started at a random position,
+		// finish earlier
+		if ((random_i >= 0) && !loopcounter && (i >= random_i))
+			break;
+	}
+
+	// if not found, return the recent candidate (or -1 if none)
+	return candidate;
+} /* Z2matrix::findrowcol */
+
+
+inline int Z2matrix::findrow (int req_elements, int start) const
+{
+	return findrowcol (req_elements, start, 1);
+} /* Z2matrix::findrow */
+
+inline int Z2matrix::low(int j)
+{
+  const chain colj = getcol(j);
+  if (colj.empty()) return -1;
+  for (int i = getncols()-1;; --i)
+    {
+      if (colj.getcoefficient(i) == (Z2integer) 1) return i+1;
+    }
+}/* Z2matrix::low */
+
+inline int Z2matrix::findcol (int req_elements, int start) const
+{
+	return findrowcol (req_elements, start, 0);
+} /* Z2matrix::findcol */
+
+
+inline int Z2matrix::reducerow (int n, int preferred)
+{
+	if (n >= nrows)
+		throw "Trying to reduce a row out of range.";
+
+	int the_other = -1;
+
+	// repeat until the row contains at most one nonzero entry
+	int len;
+	while ((len = rows [n]. size ()) > 1)
+	{
+		// copy the row to a local structure
+		chain local (rows [n]);
+
+		// find the best element in this row
+		int best_i = local. findbest (cols);
+
+		// find the number of the preferred element in the row
+		int preferred_i = (preferred < 0) ? -1 :
+			local. findnumber (preferred);
+
+		// check if the element in the preferred column
+		// is equally good as the one already chosen
+		if ((preferred_i >= 0) &&
+			(local. coef (preferred_i). delta () ==
+			local. coef (best_i). delta ()))
+			best_i = preferred_i;
+
+		// remember the column number containing this element
+		the_other = local. num (best_i);
+
+		// for each column
+		for (int i = 0; i < len; ++ i)
+		{
+			// if this column is the chosen one, do nothing
+			if (i == best_i)
+				continue;
+
+			// compute the quotient of two elements
+			Z2integer quotient = local. coef (i) /
+				local. coef (best_i);
+
+			// subtract the chosen column from the other one
+			addcol (local. num (i), local. num (best_i),
+				-quotient);
+		}
+	}
+
+	return the_other;
+} /* Z2matrix::reducerow */
+
+
+inline int Z2matrix::reducecol (int n, int preferred)
+{
+	if (n >= ncols)
+		throw "Trying to reduce a column out of range.";
+
+	int the_other = -1;
+
+	// repeat until the column contains at most one nonzero entry
+	int len;
+	while ((len = cols [n]. size ()) > 1)
+	{
+		// copy the column to a local structure
+		chain local (cols [n]);
+
+		// find the best element in this column
+		int best_i = local. findbest (rows);
+
+		// find the number of the preferred element in the row
+		int preferred_i = (preferred < 0) ? -1 :
+			local. findnumber (preferred);
+
+		// check if the element in the preferred column
+		// is equally good as the one already chosen
+		if ((preferred_i >= 0) &&
+			(local. coef (preferred_i). delta () ==
+			local. coef (best_i). delta ()))
+			best_i = preferred_i;
+
+		// remember the row number containing this element
+		the_other = local. num (best_i);
+
+		// for each row
+		for (int i = 0; i < len; ++ i)
+		{
+			// if this row is the chosen one, do nothing
+			if (i == best_i)
+				continue;
+
+			// compute the quotient of two elements
+			Z2integer quotient = local. coef (i) /
+				local. coef (best_i);
+
+			// subtract the chosen row from the other one
+			addrow (local. num (i), local. num (best_i),
+				-quotient);
+		}
+	}
+
+	return the_other;
+} /* Z2matrix::reducecol */
+
+
+inline outputstream &Z2matrix::showrowscols (outputstream &out,
+	chain *table, int tablen, int first, int howmany,
+	const char *label) const
+{
+	if ((first < 0) || (first >= tablen))
+		first = 0;
+	if ((howmany <= 0) || (first + howmany > tablen))
+		howmany = tablen - first;
+	for (int i = 0; i < howmany; ++ i)
+		out << (label ? label : "") << (first + i + 1) << ": " <<
+			table [first + i] << '\n';
+	out << '\n';
+	return out;
+} /* matrix::showrowscols */
+
+inline outputstream &Z2matrix::showrows (outputstream &out,
+	int first, int howmany, const char *label) const
+{
+	return showrowscols (out, rows, nrows, first, howmany, label);
+} /* Z2matrix::showrows */
+
+inline std::ostream &Z2matrix::showrows (std::ostream &out,
+	int first, int howmany, const char *label) const
+{
+	outputstream tout (out);
+	showrows (tout, first, howmany, label);
+	return out;
+} /* Z2matrix::showrows */
+
+inline outputstream &Z2matrix::showcols (outputstream &out,
+	int first, int howmany, const char *label) const
+{
+	return showrowscols (out, cols, ncols, first, howmany, label);
+} /* Z2matrix::showcols */
+
+inline std::ostream &Z2matrix::showcols (std::ostream &out,
+	int first, int howmany, const char *label) const
+{
+	outputstream tout (out);
+	showcols (tout, first, howmany, label);
+	return out;
+} /* Z2matrix::showcols */
+
+
+inline void Z2matrix::invert (void)
+{
+	// check if the matrix is square
+	if (nrows != ncols)
+		throw "Trying to invert a non-square matrix.";
+
+	// if the matrix is trivial, nothing needs to be done
+	if (!nrows)
+		return;
+
+	// create the identity matrix of the appropriate size
+	Z2matrix m;
+	m. identity (ncols);
+	// transform the matrix to the identity
+	// by row operations (swapping and adding)
+	// and apply the same operations to the matrix 'm'
+	for (int col = 0; col < ncols; ++ col)
+	{
+		// find an invertible element in the column
+		int len = cols [col]. size ();
+		if (len <= 0)
+		{
+			throw "Matrix inverting: Zero column found.";
+		}
+		int chosen = 0;
+		while ((chosen < len) &&
+			((cols [col]. num (chosen) < col) ||
+			(cols [col]. coef (chosen). delta () != 1)))
+		{
+			++ chosen;
+		}
+		if (chosen >= len)
+		{
+			throw "Matrix inverting: "
+				"No invertible element in a column.";
+		}
+
+		// make the leading entry equal 1 in the chosen row
+		Z2integer invcoef;
+		invcoef = 1;
+		invcoef = invcoef;
+		m. multiplyrow (cols [col]. num (chosen), invcoef);
+		multiplyrow (cols [col]. num (chosen), invcoef);
+
+		// move the chosen row to the diagonal position
+		m. swaprows (col, cols [col]. num (chosen));
+		swaprows (col, cols [col]. num (chosen));
+
+		// zero the column below and above the chosen entry
+		invcoef = -1;
+		for (int i = 0; i < len; ++ i)
+		{
+			if (cols [col]. num (i) == col)
+				continue;
+			Z2integer coef = invcoef * cols [col]. coef (i);
+			m. addrow (cols [col]. num (i), col, coef);
+			addrow (cols [col]. num (i), col, coef);
+			-- i;
+			-- len;
+		}
+	}
+
+	// take the matrix 'm' as the result
+	for (int i = 0; i < ncols; ++ i)
+	{
+		cols [i]. take (m. cols [i]);
+		rows [i]. take (m. rows [i]);
+	}
+
+	return;
+} /* Z2matrix::invert */
+
+
+inline void Z2matrix::multiply (const Z2matrix &m1,
+	const Z2matrix &m2)
+{
+	if (m1. ncols != m2. nrows)
+		throw "Trying to multiply matrices of wrong sizes.";
+	int K = m1. ncols;
+	define (m1. nrows, m2. ncols);
+	for (int i = 0; i < nrows; ++ i)
+	{
+		for (int j = 0; j < ncols; ++ j)
+		{
+			Z2integer e;
+			e = 0;
+			for (int k = 0; k < K; ++ k)
+				e += m1. get (i, k) * m2. get (k, j);
+			add (i, j, e);
+		}
+	}
+	return;
+} /* Z2matrix::multiply */
+
+void showAsMatrix(Z2matrix matrix)
+{
+  std::cout << "showAsMatrix" << matrix.getnrows() <<" times " << matrix.getncols() << std::endl;
+  for (int i = 0; i < matrix.getnrows(); ++i)
+    {
+      chain k = matrix.getrow(i);
+      for (int j = 0; j < matrix.getncols(); ++j)
+        {
+          if (k.findnumber(j) != -1)
+            {
+              std::cout << "1 " << std::flush;
+            } else
+            {
+              std::cout << "0 " << std::flush;
+            }
+        }
+      std::cout << std::endl;
+    }
+  return;
+}
+
+
+Z2matrix action(Z2matrix m,chain c)
+{
+  Z2matrix cha = Z2matrix();
+  cha.define(m.getncols(),1);
+  for (int i = 0; i < c.size(); ++i)
+    {
+      cha.add(c.num(i),0,(Z2integer) 1);
+    }
+  Z2matrix n = Z2matrix();
+  n.multiply(m,cha);
+  return n;
+
+}
+
+inline void Z2matrix::reduceBoundary (Z2matrix &boundary,Z2matrix &v)
+{
+  int size = boundary.getnrows();
+  for (int i = 0; i < size; ++i)
+    {
+      for (int j = 0; j < i; ++j)
+        {
+          if ((boundary.low(j) == boundary.low(i)) && (boundary.low(i) != -1) )
+            {
+              v.addcol(i,j,(Z2integer) 1);
+              boundary.addcol(i,j,(Z2integer) 1);
+              j = 0;
+            }
+        }
+    }
+}
+
+// make boudary operator from simpleces list(std::vector<std::vector<int>> simpleces)
+inline Z2matrix makeBoundaryMatrix(std::vector<std::vector<int>> simpleces){
+  int size = simpleces.size() + 1;
+  Z2matrix boundary = Z2matrix();
+  boundary.define(size,size);
+  for (int i = 0; i < size-1; ++i)
+    {
+      for (int j = 0; j < size-1; ++j)
+        {
+          if(simpleces[j].size() == 1 && i == 0){
+            boundary.add(0,j+1,(Z2integer) 1);
+          }
+          if(isFace(simpleces[j],simpleces[i])){
+            boundary.add(i+1,j+1,(Z2integer) 1);
+          }
+        }
+    }
+  return boundary;
+}
+
+
+
+
+inline int zero(std::vector<std::vector<int>> simpleces,Z2matrix reducedBoundary,int p)
+{
+  /*make index list*/
+  std::vector<int> indexlist;
+  for (int i = 0; i < simpleces.size(); ++i)
+    {
+      /* number of vertex in simplex minus 1 equals to dim*/
+      if (simpleces[i].size()-1 == p)
+        {
+          indexlist.push_back(i+1);
+        }
+    }
+  int sum = 0;
+  for (auto index :indexlist)
+    {
+      if (reducedBoundary.getcol(index).empty() || reducedBoundary.getcol(index).num(0) == 0)
+        {
+          sum += 1;
+        }
+    }
+  return sum;
+}
+
+
+inline std::vector<int> lowestIndexList(std::vector<std::vector<int>> simpleces,Z2matrix reducedBoundary,int p)
+{
+    /* make index list */
+  std::vector<int> indexlist;
+  for (int i = 0; i < simpleces.size(); ++i)
+    {
+      /* number of vertex in simplex-1 equals to dim +1 */
+      if (simpleces[i].size()-1 == p+1)
+        {
+          indexlist.push_back(i+1);
+        }
+    }
+  std::vector<int> lowest = {};
+  for (auto index :indexlist)
+    {
+      if (reducedBoundary.low(index) != -1)
+        {
+          if (!isIn(lowest,reducedBoundary.low(index)))
+            {
+              lowest.push_back(reducedBoundary.low(index));
+            }
+        }
+    }
+  return lowest;
+}
+
+
+
+int lowestNum(std::vector<std::vector<int>> simpleces,Z2matrix reducedBoundary,int p)
+{
+    /* make index list */
+  std::vector<int> indexlist;
+  for (int i = 0; i < simpleces.size(); ++i)
+    {
+      /* number of vertex in simplex-1 equals to dim +1 */
+      if (simpleces[i].size()-1 == p+1)
+        {
+          indexlist.push_back(i);
+        }
+    }
+  std::vector<int> lowest = {};
+  for (auto index :indexlist)
+    {
+      if (reducedBoundary.low(index) != -1)
+        {
+          if (!isIn(lowest,reducedBoundary.low(index)))
+            {
+              lowest.push_back(reducedBoundary.low(index));
+            }
+        }
+    }
+  return lowest.size();
+}
+
+void showHomology(Z2matrix reducedBoundary, std::vector<std::vector<int>> simpleces){
+  int topdim = dimention(simpleces);
+  std::cout << std::endl;
+  for (int p = 0; p < topdim; ++p)
+    {
+      int betti = zero(simpleces,reducedBoundary,p) - lowestNum(simpleces,reducedBoundary,p);
+      if (betti == 0)
+        {
+          std::cout << "H_" << p << " = 0" << std::endl;
+        } else if(betti == 1){
+      std::cout << "H_" << p << " = Z_2" << std::endl;
+      } else {
+        std::cout << "H_" << p << " = Z_2^" << betti <<  std::endl;
+      }
+    }
+  std::cout << std::endl;
+}
+
+
+void showHomologyGenerator(Z2matrix reducedBoundary,Z2matrix basisChange, std::vector<std::vector<int>> simpleces,std::vector<int> &generatorIndexList)
+{
+  std::vector<int> indexList;
+  std::vector<chain> chainList;
+  int topdim = dimention(simpleces);
+  std::cout <<  std::endl;
+  for (int p = 0; p < topdim; ++p)
+    {
+      indexList = {};
+      /* make index List */
+      for (int i = 0; i < simpleces.size(); ++i)
+        {
+          if (simpleces[i].size()-1 == p)
+            {
+              indexList.push_back(i+1);
+            }
+        }
+      int betti = zero(simpleces,reducedBoundary,p) - lowestNum(simpleces,reducedBoundary,p);
+      for(auto index:indexList)
+        {
+          std::vector<int> pLowestList = lowestIndexList(simpleces,reducedBoundary,p);
+          /* Col(ind) is 0-vector && Row(ind) has no lowest 1*/
+          if ((reducedBoundary.getcol(index).empty() || reducedBoundary.getcol(index).num(0) == 0) && (!isIn(pLowestList,index+1)))
+            {
+              /* V's Col(ind) is added to generator list */
+              chainList.push_back(basisChange.getcol(index));
+              generatorIndexList.push_back(index);
+            }
+        }
+        /*show H_p generators */
+      /* std::cout << std::endl; */
+      std::cout << "The generator(s) of H_" << p << " :"<< std::endl;
+      // std::cout << std::endl;
+      showChainAsVertex(simpleces,chainList,true,p);
+      chainList = {};
+    }
+}
+
+
+inline int findlowCol(Z2matrix matrix,int n){
+  for (int i = 0; i < matrix.getncols(); ++i)
+    {
+      if (matrix.low(i) == n){
+        return i;
+      }
+    }
+  return -1;
+
+}
+inline void detectWhitneyClass(chain &whitneychain,Z2matrix image,const std::vector<int> generatorIndexList){
+  chain detection = whitneychain;
+  while(detection.size() != 0)
+    {
+      int target = detection.num(detection.size()-1);
+      if (isIn(generatorIndexList,target))
+        {
+          detection.add(target);
+        }
+      else
+        {
+          chain tmp = image.getcol(findlowCol(image,target+1));
+          detection.add(tmp);
+          whitneychain.add(tmp);
+        }
+    }
+}
+
+inline void showWhitneyClass(chain whitneychainAfter,/* Z2matrix basechange, */std::vector<std::vector<int>> simpleces,std::vector<int> generatorIndexList)
+{
+  std::vector<int> indexList;
+  std::vector<chain> chainList;
+
+  int topdim = dimention(simpleces);
+
+  for (int p = 0; p < topdim; ++p)
+    {
+      indexList = {};
+      /* make p-dim homology generator's index List */
+      for (auto i:generatorIndexList)
+        {
+          if (simpleces[i-1].size()-1 == p /* & whitneychain.findnumber(i) != -1 */)
+            {
+              indexList.push_back(i);
+            }
+        }
+
+      /* show w_p generators */
+      std::cout << std::endl;
+      std::cout << " The generator(s) of w_" << p << " :"<< std::endl;
+      int num = 0;
+      std::vector<std::string> whitneygenerators;
+      for (int k = 0; k < indexList.size(); ++k)
+        {
+          if (whitneychainAfter.findnumber(indexList[k]) != -1)
+            {
+              std::stringstream ss;
+              ss << "g_" << num << "^" << p;
+              whitneygenerators.push_back(ss.str());
+            }
+          num += 1;
+        }
+      if (whitneygenerators.size() == 0)
+        {
+          std::cout << "None" << std::endl;
+        }
+      else {
+        for (int i = 0; i < whitneygenerators.size()-1; ++i)
+          {
+            std::cout << whitneygenerators[i] << " + " << std::flush;
+          }
+        std::cout << whitneygenerators[whitneygenerators.size()-1] << std::endl;
+        /* std::cout << std::endl; */
+      }
+      /* std::cout << std::endl; */
+    }
+}
+
+/* inline void showWhitneyAsHomGen(std::vector<chain> chainList,std::vector<int> generatorIndexList,int dim){ */
+/*   if(chainList.empty()){ */
+/*     std::cout <<"None"<< std::endl; */
+/*   } else { */
+/*     for (auto x:generatorIndexList) */
+/*       { */
+/*         if () */
+/*           { */
+/*           } */
+/*       } */
+/*   } */
+/*   std::cout << std::endl; */
+/* } */
+
+
+
+
+
+inline void Z2matrix::increase (int numrows, int numcols)
+{
+	increaserows (numrows);
+	increasecols (numcols);
+	return;
+} /* Z2matrix::increase */
+
+
+inline void Z2matrix::increaserows (int numrows)
+{
+	if (allrows >= numrows)
+		return;
+	chain *newrows = new chain [numrows];
+	if (!newrows)
+		throw "Not enough memory for matrix rows.";
+	for (int i = 0; i < nrows; ++ i)
+		newrows [i]. take (rows [i]);
+	if (rows)
+		delete [] rows;
+	rows = newrows;
+	allrows = numrows;
+	return;
+} /* Z2matrix::increaserows */
+
+
+inline void Z2matrix::increasecols (int numcols)
+{
+	if (allcols >= numcols)
+		return;
+	chain *newcols = new chain [numcols];
+	if (!newcols)
+		throw "Not enough memory for matrix columns.";
+	for (int i = 0; i < ncols; ++ i)
+		newcols [i]. take (cols [i]);
+	if (cols)
+		delete [] cols;
+	cols = newcols;
+	allcols = numcols;
+
+	return;
+} /* Z2matrix::increasecols */
+
+// --------------------------------------------------
+
+/// Writes a matrix to the output stream as a map in terms of columns.
+/// Warning: The operators >> and << are not symmetric for matrices.
+inline std::ostream &operator << (std::ostream &out,
+	const Z2matrix &m)
+{
+	return m. showcols (out);
+} /* operator << */
+
+
+#endif
