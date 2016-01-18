@@ -59,11 +59,12 @@ int main(int argc,char *argv[])
   }
   bool euler = isEuler(filename);
   int numArrow = numberOfArrow(filename);
-  int arrowList[numArrow][2];
+  std::vector<std::array<int,2>> arrowList;
+  // int arrowList[numArrow][2];
   makeArrowList(filename,arrowList);
+
   std::vector<int> vertexList;
   vertexSet(arrowList,numArrow,vertexList);
-
   if (euler)
     {
       std::cout << "The poset is Euler! " << std::endl;

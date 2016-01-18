@@ -41,6 +41,7 @@
 #include <cstdlib>
 #include <iomanip>
 #include <algorithm>
+#include <array>
 #include "poset_convert.h"
 #define CHAINFIXED 1
 class outputstream;
@@ -389,9 +390,9 @@ public:
         void showChainAsVertex(std::vector<std::vector<int>> simpleces,std::vector<chain> chainList,bool homFlag, int homDim);
 
         /* for making the chain which represents whitney classes without subivision. */
-        bool isExistSmaller(int g,std::vector<int> sigma,std::vector<int> vertexSet, int arrowList[][2],int numberOfArrows);
-        bool isExistBigger(int l,std::vector<int> sigma,std::vector<int> vertexSet, int arrowList[][2],int numberOfArrows);
-        bool isExistBitween(int l,int g,std::vector<int> sigma,std::vector<int> vertexSet, int arrowList[][2],int numberOfArrows);
+        bool isExistSmaller(int g,std::vector<int> sigma,std::vector<int> vertexSet,std::vector<std::array<int,2>> arrowList /* int arrowList[][2] */,int numberOfArrows);
+        bool isExistBigger(int l,std::vector<int> sigma,std::vector<int> vertexSet,std::vector<std::array<int,2>> arrowList /* int arrowList[][2] */,int numberOfArrows);
+        bool isExistBitween(int l,int g,std::vector<int> sigma,std::vector<int> vertexSet,std::vector<std::array<int,2>> arrowList /* int arrowList[][2] */,int numberOfArrows);
         bool isRegular(std::vector<int> sigma,std::vector<int> tau);
         chain makeWhitneyChain(int p,std::vector<std::vector<int>> simpleces);
 
@@ -1405,7 +1406,7 @@ inline void showChainAsVertex(std::vector<std::vector<int>> simpleces,std::vecto
   /* std::cout << std::endl; */
 }
 
-bool isExistSmaller(int g,std::vector<int> sigma,std::vector<int> vertexSet, int arrowList[][2],int numberOfArrows)
+bool isExistSmaller(int g,std::vector<int> sigma,std::vector<int> vertexSet,std::vector<std::array<int,2>> arrowList /* int arrowList[][2] */,int numberOfArrows)
 {
   for (auto x:sigma)
     {
@@ -1418,7 +1419,7 @@ bool isExistSmaller(int g,std::vector<int> sigma,std::vector<int> vertexSet, int
   return false;
 }
 
-bool isExistBigger(int l,std::vector<int> sigma,std::vector<int> vertexSet, int arrowList[][2],int numberOfArrows)
+bool isExistBigger(int l,std::vector<int> sigma,std::vector<int> vertexSet,std::vector<std::array<int,2>> arrowList /* int arrowList[][2] */,int numberOfArrows)
 {
   for (auto x:sigma)
     {
@@ -1431,7 +1432,7 @@ bool isExistBigger(int l,std::vector<int> sigma,std::vector<int> vertexSet, int 
   return false;
 }
 
-bool isExistBitween(int l,int g,std::vector<int> sigma,std::vector<int> vertexSet, int arrowList[][2],int numberOfArrows)
+bool isExistBitween(int l,int g,std::vector<int> sigma,std::vector<int> vertexSet, std::vector<std::array<int,2>> arrowList/* int arrowList[][2] */,int numberOfArrows)
 {
   for (auto x:sigma)
     {
@@ -1444,7 +1445,7 @@ bool isExistBitween(int l,int g,std::vector<int> sigma,std::vector<int> vertexSe
   return false;
 }
 
-bool isRegular(std::vector<int> sigma,std::vector<int> tau,std::vector<int> vertexSet, int arrowList[][2],int numberOfArrows)
+bool isRegular(std::vector<int> sigma,std::vector<int> tau,std::vector<int> vertexSet,std::vector<std::array<int,2>> arrowList /* int arrowList[][2] */,int numberOfArrows)
 {
   if (!isSubset(tau,sigma)) return false;
   /*if number of tau's int which is less than sigma[0] is nonzero return false*/
@@ -1470,7 +1471,7 @@ bool isRegular(std::vector<int> sigma,std::vector<int> tau,std::vector<int> vert
 }
 
 
-inline chain makeWhitneyChain(int p,std::vector<std::vector<int>> simpleces,std::vector<int> vertexSet, int arrowList[][2],int numberOfArrows)
+inline chain makeWhitneyChain(int p,std::vector<std::vector<int>> simpleces,std::vector<int> vertexSet,std::vector<std::array<int,2>> arrowList /* int arrowList[][2] */,int numberOfArrows)
 {
   chain res = chain();
   /*次元が一致する simplex (sigma)についてのループ*/

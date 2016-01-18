@@ -38,6 +38,7 @@
 #include <stdlib.h>
 #include <regex>
 #include <vector>
+#include <array>
 #include <set>
 #include <map>
 
@@ -156,7 +157,7 @@ bool isSubset(std::vector<int> listA,std::vector<int> listB){
 
 
 
-std::vector<int> maximals(int arrowList[][2],int numberOfArrows){
+std::vector<int> maximals(std::vector<std::array<int,2>> arrowList/* int arrowList[][2] */,int numberOfArrows){
   std::vector<int> maximalList;
   int frag = 1;
   for (int i = 0; i < numberOfArrows; ++i)
@@ -182,7 +183,7 @@ std::vector<int> maximals(int arrowList[][2],int numberOfArrows){
   return maximalList;
 }
 
-std::vector<int> minimals(int arrowList[][2],int numberOfArrows){
+std::vector<int> minimals(std::vector<std::array<int,2>> arrowList/* int arrowList[][2] */,int numberOfArrows){
   std::vector<int> minimalList;
   int frag = 1;
   for (int i = 0; i < numberOfArrows; ++i)
@@ -208,7 +209,7 @@ std::vector<int> minimals(int arrowList[][2],int numberOfArrows){
   return minimalList;
 }
 
-void vertexSet(int arrowList[][2],int numberOfArrows,std::vector<int>& vertexList){
+void vertexSet(std::vector<std::array<int,2>> arrowList/* int arrowList[][2] */,int numberOfArrows,std::vector<int>& vertexList){
   for (int i = 0; i < numberOfArrows; ++i)
     {
       vertexList.push_back(arrowList[i][0]);
@@ -218,7 +219,7 @@ void vertexSet(int arrowList[][2],int numberOfArrows,std::vector<int>& vertexLis
   vertexList.erase(std::unique(vertexList.begin(), vertexList.end()), vertexList.end());
 }
 
-void vertexPairSet(int arrowList[][2],int numberOfArrows,std::vector<std::vector<int>>& pairList){
+void vertexPairSet(std::vector<std::array<int,2>> arrowList/* ,int arrowList[][2] */,int numberOfArrows,std::vector<std::vector<int>>& pairList){
   std::vector<int> vertexList;
   vertexSet(arrowList,numberOfArrows,vertexList);
   int k = 0;
@@ -234,7 +235,7 @@ void vertexPairSet(int arrowList[][2],int numberOfArrows,std::vector<std::vector
 }
 
 
-std::vector<int> nexts(int arrowList[][2],int numberOfArrows,int n){
+std::vector<int> nexts(std::vector<std::array<int,2>> arrowList/* ,int arrowList[][2] */,int numberOfArrows,int n){
   std::vector<int> nextList;
   for (int i = 0; i < numberOfArrows; ++i)
     {
@@ -246,7 +247,7 @@ std::vector<int> nexts(int arrowList[][2],int numberOfArrows,int n){
   return nextList;
 }
 
-std::vector<int> previous(int arrowList[][2],int numberOfArrows,int n){
+std::vector<int> previous(std::vector<std::array<int,2>> arrowList/* int arrowList[][2] */,int numberOfArrows,int n){
   std::vector<int> previousList;
   for (int i = 0; i < numberOfArrows; ++i)
     {
@@ -259,7 +260,7 @@ std::vector<int> previous(int arrowList[][2],int numberOfArrows,int n){
 }
 
 
-void biggerMake(int arrowList[][2],int numberOfArrows,std::vector<int> vertexSet,std::vector<int> &bigger,int v){
+void biggerMake(std::vector<std::array<int,2>> arrowList/* int arrowList[][2] */,int numberOfArrows,std::vector<int> vertexSet,std::vector<int> &bigger,int v){
   std::vector<int> maximalList = maximals(arrowList,numberOfArrows);
   if (isIn(maximalList,v))
     {
@@ -274,13 +275,13 @@ void biggerMake(int arrowList[][2],int numberOfArrows,std::vector<int> vertexSet
   bigger.erase(std::unique(bigger.begin(), bigger.end()), bigger.end());
 }
 
-std::vector<int> biggerVertex(int arrowList[][2],int numberOfArrows,std::vector<int> vertexSet,int v){
+std::vector<int> biggerVertex(std::vector<std::array<int,2>> arrowList/* int arrowList[][2] */,int numberOfArrows,std::vector<int> vertexSet,int v){
   std::vector<int> bigger;
   biggerMake(arrowList,numberOfArrows,vertexSet,bigger,v);
   return bigger;
 }
 
-void smallerMake(int arrowList[][2],int numberOfArrows,std::vector<int> vertexSet,std::vector<int> &smaller,int v){
+void smallerMake(std::vector<std::array<int,2>> arrowList/* int arrowList[][2] */,int numberOfArrows,std::vector<int> vertexSet,std::vector<int> &smaller,int v){
   std::vector<int> minimalList = minimals(arrowList,numberOfArrows);
   if (isIn(minimalList,v))
     {
@@ -295,7 +296,7 @@ void smallerMake(int arrowList[][2],int numberOfArrows,std::vector<int> vertexSe
   smaller.erase(std::unique(smaller.begin(), smaller.end()), smaller.end());
 }
 
-std::vector<int> smallerVertex(int arrowList[][2],int numberOfArrows,std::vector<int> vertexSet,int v){
+std::vector<int> smallerVertex(std::vector<std::array<int,2>> arrowList/* int arrowList[][2] */,int numberOfArrows,std::vector<int> vertexSet,int v){
   std::vector<int> smaller;
   smallerMake(arrowList,numberOfArrows,vertexSet,smaller,v);
   return smaller;
@@ -330,7 +331,7 @@ std::vector<int> unionSet(std::vector<int> x,std::vector<int> y){
 }
 
 
-std::vector<int> betweenVertex(int arrowList[][2],int numberOfArrows,std::vector<int> vertexSet,int x,int y){
+std::vector<int> betweenVertex(std::vector<std::array<int,2>> arrowList/* int arrowList[][2]*/,int numberOfArrows,std::vector<int> vertexSet,int x,int y){
   std::vector<int> biggerX = biggerVertex(arrowList,numberOfArrows,vertexSet,x);
   std::vector<int> biggerY = biggerVertex(arrowList,numberOfArrows,vertexSet,y);
   std::vector<int> smallerX = smallerVertex(arrowList,numberOfArrows,vertexSet,x);
@@ -338,7 +339,7 @@ std::vector<int> betweenVertex(int arrowList[][2],int numberOfArrows,std::vector
   return unionSet(intersectionSet(biggerX,smallerY),intersectionSet(smallerX,biggerY));
 }
 
-int extends(int arrowList[][2], int numberOfArrows,int currentPoint, std::vector<int> &currentSeed,std::vector<std::vector<int>> &resultList){
+int extends(std::vector<std::array<int,2>> arrowList/* int arrowList[][2] */, int numberOfArrows,int currentPoint, std::vector<int> &currentSeed,std::vector<std::vector<int>> &resultList){
   if (isIn(maximals(arrowList,numberOfArrows),currentPoint))
     {
       resultList.push_back(currentSeed);
@@ -357,7 +358,7 @@ int extends(int arrowList[][2], int numberOfArrows,int currentPoint, std::vector
 }
 
 
-void maximalChains(int arrowList[][2],int numberOfArrows,std::vector<std::vector<int>> &resultList){
+void maximalChains(std::vector<std::array<int,2>> arrowList/* int arrowList[][2] */,int numberOfArrows,std::vector<std::vector<int>> &resultList){
   std::vector<int> minlist = minimals(arrowList,numberOfArrows);
   int size = minlist.size();
   for (int i = 0; i < size; ++i)
@@ -377,7 +378,7 @@ int numberOfArrow(std::string filename) {
     return 0;
 }
 
-void makeArrowList(std::string filename,int arrowList[][2]){
+void makeArrowList(std::string filename,std::vector<std::array<int,2>> &arrowList/* int arrowList[][2] */){
   int numberOfArrows = 0;
   if(isDataValid(filename, numberOfArrows)){
 
@@ -391,12 +392,15 @@ void makeArrowList(std::string filename,int arrowList[][2]){
             std::string tmp;
             std::istringstream strm(str);
             int vertexIndex = 0;
+            std::array<int,2> test;
             while(getline(strm,tmp,','))
               {
-                arrowList[arrowIndex][vertexIndex] = str_to_int(trim(tmp));
+                /* arrowList[arrowIndex][vertexIndex] = str_to_int(trim(tmp));*/
+                /* arrowList[vertexIndex][arrowIndex] = str_to_int(trim(tmp)); */
+                test[vertexIndex] = str_to_int(trim(tmp));
                 vertexIndex += 1;
               }
-            arrowIndex += 1;
+            arrowList.push_back(test);
           }
       }
     return;
@@ -405,7 +409,7 @@ void makeArrowList(std::string filename,int arrowList[][2]){
 }
 
 /* if a < b  in P ,then return true. */
-bool greater(int a,int b,std::vector<int> vertexSet, int arrowList[][2],int numberOfArrows){
+bool greater(int a,int b,std::vector<int> vertexSet,std::vector<std::array<int,2>> arrowList /* int arrowList[][2] */,int numberOfArrows){
   if (!(isIn(vertexSet,a) & isIn(vertexSet,b)))
     {
       std::cerr << "Nor first and second integer is included vertexSet";
@@ -551,7 +555,8 @@ std::vector<std::vector<int>> getMaximalChains(std::string file){
   std::string filename = file;
   int numberOfArrows = 0;
   if(isDataValid(filename, numberOfArrows)){
-    int arrowList[numberOfArrows][2];
+    /* int arrowList[numberOfArrows][2]; */
+    std::vector<std::array<int,2>> arrowList;
     std::ifstream ifs(filename);
     std::string str;
     int arrowIndex = 0;
@@ -562,12 +567,15 @@ std::vector<std::vector<int>> getMaximalChains(std::string file){
             std::string tmp;
             std::istringstream strm(str);
             int vertexIndex = 0;
+            std::array<int,2> test;
             while(getline(strm,tmp,','))
               {
-                arrowList[arrowIndex][vertexIndex] = str_to_int(trim(tmp));
+                /* arrowList[arrowIndex][vertexIndex] = str_to_int(trim(tmp));*/
+                /* arrowList[vertexIndex][arrowIndex] = str_to_int(trim(tmp)); */
+                test[vertexIndex] = str_to_int(trim(tmp));
                 vertexIndex += 1;
               }
-            arrowIndex += 1;
+            arrowList.push_back(test);
           }
       }
     std::vector<std::vector<int>> resultList;
@@ -601,7 +609,7 @@ int endNum(int p,std::vector<std::vector<int>> simpleces){
 }
 
 /* totally oreder subsets with vertrces bigger than v.*/
-std::vector<std::vector<int>> biggerSimplex(int arrowList[][2],int numberOfArrows,std::vector<int> vertex,std::vector<std::vector<int>> simpleces, int v){
+std::vector<std::vector<int>> biggerSimplex(std::vector<std::array<int,2>> arrowList/* int arrowList[][2] */,int numberOfArrows,std::vector<int> vertex,std::vector<std::vector<int>> simpleces, int v){
   std::vector<std::vector<int>> resultList;
   for (auto ch:simpleces)
     {
@@ -611,7 +619,7 @@ std::vector<std::vector<int>> biggerSimplex(int arrowList[][2],int numberOfArrow
 }
 
 /* totally oreder subsets with vertrces smaller than v.*/
-std::vector<std::vector<int>> smallerSimplex(int arrowList[][2],int numberOfArrows,std::vector<int> vertex,std::vector<std::vector<int>> simpleces, int v){
+std::vector<std::vector<int>> smallerSimplex(std::vector<std::array<int,2>> arrowList/* int arrowList[][2] */,int numberOfArrows,std::vector<int> vertex,std::vector<std::vector<int>> simpleces, int v){
   std::vector<std::vector<int>> resultList;
   for (auto ch:simpleces)
     {
@@ -621,7 +629,7 @@ std::vector<std::vector<int>> smallerSimplex(int arrowList[][2],int numberOfArro
 }
 
 /* totally oreder subsets with vertrices between v & w.*/
-std::vector<std::vector<int>> betweenSimplex(int arrowList[][2],int numberOfArrows,std::vector<int> vertex,std::vector<std::vector<int>> simpleces, int v , int w){
+std::vector<std::vector<int>> betweenSimplex(std::vector<std::array<int,2>> arrowList/* int arrowList[][2] */,int numberOfArrows,std::vector<int> vertex,std::vector<std::vector<int>> simpleces, int v , int w){
   std::vector<std::vector<int>> resultList;
   for (auto ch:simpleces)
     {
@@ -638,7 +646,7 @@ std::vector<std::vector<int>> betweenSimplex(int arrowList[][2],int numberOfArro
 /*
   euler poset or not
 */
-bool isEuler(int arrowList[][2],int numberOfArrows,std::vector<std::vector<int>> simpleces){
+bool isEuler(std::vector<std::array<int,2>> arrowList/* int arrowList[][2] */,int numberOfArrows,std::vector<std::vector<int>> simpleces){
   int sum = 0;
   std::vector<int> vertex;
   vertexSet(arrowList,numberOfArrows,vertex);
@@ -646,7 +654,6 @@ bool isEuler(int arrowList[][2],int numberOfArrows,std::vector<std::vector<int>>
   int pairsNum = (n*(n-1))/2;
   std::vector< std::vector<int> > pair (pairsNum, std::vector<int>(2));
   vertexPairSet(arrowList,numberOfArrows,pair);
-
   for(auto v:vertex)
     {
       sum = 0;
@@ -678,7 +685,8 @@ bool isEuler(int arrowList[][2],int numberOfArrows,std::vector<std::vector<int>>
 bool isEuler(std::string filename){
   int numberOfArrows = 0;
   if(isDataValid(filename, numberOfArrows)){
-    int arrowList[numberOfArrows][2];
+    /* int arrowList[numberOfArrows][2]; */
+    std::vector<std::array<int,2>> arrowList;
     std::ifstream ifs(filename);
     std::string str;
     int arrowIndex = 0;
@@ -689,17 +697,19 @@ bool isEuler(std::string filename){
             std::string tmp;
             std::istringstream strm(str);
             int vertexIndex = 0;
+            std::array<int,2> test;
             while(getline(strm,tmp,','))
               {
-                arrowList[arrowIndex][vertexIndex] = str_to_int(trim(tmp));
+                /* arrowList[arrowIndex][vertexIndex] = str_to_int(trim(tmp));*/
+                /* arrowList[vertexIndex][arrowIndex] = str_to_int(trim(tmp)); */
+                test[vertexIndex] = str_to_int(trim(tmp));
                 vertexIndex += 1;
               }
-            arrowIndex += 1;
+            arrowList.push_back(test);
           }
       }
     std::vector<std::vector<int>> maximalChains = getMaximalChains(filename);
     std::vector<std::vector<int>> simpleces = getChainComplexGenerators(maximalChains);
-
     return isEuler(arrowList,numberOfArrows,simpleces);
   }
 }
