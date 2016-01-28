@@ -354,7 +354,7 @@ public:
 
         int findlowCol(Z2matrix matrix,int n);
 
-        void detectWhitneyClass(chain &whitneychain, Z2matrix image,const std::vector<int> generatorIndexList);
+        void detectWhitneyClass(chain &whitneyChain, Z2matrix image,const std::vector<int> generatorIndexList);
 
         void showWhitneyClass(chain whitneychain, /* Z2matrix basechange, */std::vector<std::vector<int>> simpleces,std::vector<int> generatorIndexList);
         /* void showWhitneyAsHomGen(std::vector<chain> chainList,std::vector<int> generatorIndexList); */
@@ -1150,6 +1150,14 @@ inline void Z2matrix::reduceBoundary (Z2matrix &boundary,Z2matrix &v)
 // make boudary operator from simpleces list(std::vector<std::vector<int>> simpleces)
 inline Z2matrix makeBoundaryMatrix(std::vector<std::vector<int>> simpleces){
   int size = simpleces.size() + 1;
+  /* debug */
+  /* for (auto x:simpleces) */
+  /*   { */
+  /*     for(auto y:x){ */
+  /*       std::cout << y << "," << std::flush; */
+  /*     } */
+  /*     std::cout << std::endl; */
+  /*   } */
   Z2matrix boundary = Z2matrix();
   boundary.define(size,size);
   for (int i = 0; i < size-1; ++i)
@@ -1231,7 +1239,7 @@ int lowestNum(std::vector<std::vector<int>> simpleces,Z2matrix reducedBoundary,i
       /* number of vertex in simplex-1 equals to dim +1 */
       if (simpleces[i].size()-1 == p+1)
         {
-          indexlist.push_back(i);
+          indexlist.push_back(i+1);
         }
     }
   std::vector<int> lowest = {};
@@ -1254,6 +1262,7 @@ void showHomology(Z2matrix reducedBoundary, std::vector<std::vector<int>> simple
   for (int p = 0; p < topdim; ++p)
     {
       int betti = zero(simpleces,reducedBoundary,p) - lowestNum(simpleces,reducedBoundary,p);
+      /* std::cout << "p:" << p << "betti:" << betti<< " = zero" << zero(simpleces,reducedBoundary,p) << " - low" << lowestNum(simpleces,reducedBoundary,p) << std::endl; */
       if (betti == 0)
         {
           std::cout << "H_" << p << " = 0" << std::endl;
@@ -1356,13 +1365,14 @@ inline void showWhitneyClass(chain whitneychainAfter,/* Z2matrix basechange, */s
       /* show w_p generators */
       std::cout << std::endl;
       std::cout << " The generator(s) of w_" << p << " :"<< std::endl;
-      int num = 0;
+      int num = 1;
       std::vector<std::string> whitneygenerators;
       for (int k = 0; k < indexList.size(); ++k)
         {
           if (whitneychainAfter.findnumber(indexList[k]) != -1)
             {
               std::stringstream ss;
+              /* std::cout << "num; " << num << std::endl; */
               ss << "g" << p <<"_" << num;
               whitneygenerators.push_back(ss.str());
             }
