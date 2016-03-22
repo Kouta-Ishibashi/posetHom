@@ -42,7 +42,7 @@
 #include <set>
 #include <map>
 
-
+//^\n
 bool isComment(std::string str){
     std::regex comment(";.+");
     return std::regex_match(str,comment);
@@ -53,6 +53,11 @@ bool isArrow(std::string str){
   std::regex arrowEd(".+}",std::regex_constants::extended);
   return std::regex_match(str,arrow) && std::regex_match(str,arrowEd);
     }
+
+bool isSimplex(std::string str){
+  std::regex smpl("\\{([0-9]+,)*[0-9]+\\}");
+  return std::regex_match(str,smpl);
+}
 
 
 bool isDataValid(std::string filename,int& lineNumber){
@@ -94,6 +99,24 @@ bool isDataValid(std::string filename){
     }
   return true;
 }
+
+bool isValidSimplex(std::string filename){
+  std::ifstream ifs(filename);
+  std::string str;
+  if (ifs.fail())
+    {
+      return false;
+    }
+  while(getline(ifs,str))
+    {
+      if (!isComment(str) && !isSimplex(str))
+        {
+        return false;
+      }
+    }
+  return true;
+}
+
 
 
 std::string trim(std::string str){
@@ -551,12 +574,51 @@ std::vector<std::vector<int>> getChainComplexGenerators(std::vector<std::vector<
 }
 
 
-std::vector<std::vector<int>> getMaximalChains(std::string file){
+/* getMaximalSimplex */
+
+std::vector<std::vector<int>> getMaximalSimplex(std::string file){
   std::string filename = file;
+  std::vector<std::vector<int>> resultList;
+  int numberOfArrows = 0;
+
+  if(isValidSimplex(file)){
+    std::ifstream ifs(filename);
+    std::string str;
+
+    while(getline(ifs,str))
+      {
+        std::string tmp;
+        std::istringstream strm(str);
+        int vertexIndex = 0;
+        std::vector<int> simplex;
+        while(getline(strm,tmp,','))
+          {
+            simplex.push_back(str_to_int(trim(tmp)));
+            vertexIndex += 1;
+          }
+        resultList.push_back(simplex);
+      }
+    return resultList;
+  } else {
+    std::cerr << "Data is not valid.";
+  }
+}
+
+
+
+
+
+
+
+/* getMaximalChains */
+
+std::vector<std::vector<int>> getMaximalChains(std::string simplexFile){
+  std::string filename = simplexFile;
   int numberOfArrows = 0;
   if(isDataValid(filename, numberOfArrows)){
     /* int arrowList[numberOfArrows][2]; */
     std::vector<std::array<int,2>> arrowList;
+
     std::ifstream ifs(filename);
     std::string str;
     int arrowIndex = 0;
@@ -585,6 +647,21 @@ std::vector<std::vector<int>> getMaximalChains(std::string file){
     std::cerr << "Data is not valid.";
   }
 }
+
+void makeVertexAndArrowList(std::vector<std::vector<int>> simpleces,std::vector<int> &vertexList,std::vector<std::array<int,2>> &arrowList){
+  for (int i = 0 ; i < simpleces.size() ; ++i)
+    {
+      if(simpleces[i].size() == 1){
+        vertexList.push_back(simpleces[i][0]);
+      } else if (simpleces[i].size()==2){
+        std::array<int,2> tmp;
+        tmp[0] = simpleces[i][0];
+        tmp[1] = simpleces[i][1];
+        arrowList.push_back(tmp);
+      }
+    }
+}
+
 
 /* first index which represent p-dim simplex */
 int beginNum(int p,std::vector<std::vector<int>> simpleces){
@@ -712,6 +789,45 @@ bool isEuler(std::string filename){
     std::vector<std::vector<int>> simpleces = getChainComplexGenerators(maximalChains);
     return isEuler(arrowList,numberOfArrows,simpleces);
   }
+}
+
+bool isEulerSimpComp(std::vector<std::vector<int>> simpleces){
+  int sum = 0;
+  std::vector<int> vertexList;
+  std::vector<std::array<int,2>> arrowList;
+
+  makeVertexAndArrowList(simpleces,vertexList,arrowList);
+
+  int n = vertexList.size();
+  int numberOfArrows = arrowList.size();
+  int pairsNum = (n*(n-1))/2;
+  std::vector< std::vector<int> > pair (pairsNum, std::vector<int>(2));
+  vertexPairSet(arrowList,numberOfArrows,pair);
+
+  for(auto v:vertexList)
+    {
+      sum = 0;
+      sum = biggerSimplex(arrowList,numberOfArrows,vertexList,simpleces,v).size();
+      if (sum % 2 == 1){
+        return false;
+      }
+      sum = 0;
+      sum = smallerSimplex(arrowList,numberOfArrows,vertexList,simpleces,v).size();
+      if (sum % 2 == 1){
+        return false;
+      }
+    }
+  for (int i = 0; i < pair.size();++i)
+    {
+      sum = 0;
+      int x = pair[i][0];
+      int y = pair[i][1];
+      sum = betweenSimplex(arrowList, numberOfArrows, vertexList, simpleces, x , y).size();
+      if (sum % 2 == 1){
+        return false;
+      }
+    }
+  return true;
 }
 
 

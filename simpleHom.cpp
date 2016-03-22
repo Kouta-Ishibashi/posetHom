@@ -1,10 +1,10 @@
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @file posetHom.cpp
+/// @file simpleHom.cpp
 ///
-/// This file is the main program of posetHom.
-/// Using the poset data in a text, compute homology
-/// and whitney class if euler.
+/// This file is the main program of simpleHom.
+/// Using the maximal pimplex data in a text, compute homology
+/// and whitney class if defined.
 ///
 /// @auther Kota Ishibashi
 ///
@@ -51,30 +51,44 @@ int main(int argc,char *argv[])
       std::cout << "Too many argument.The number of argument should be only one: text file name." << std::endl;
       return 0;
     }
+
   std::string filename = argv[1];
-  bool valid = isDataValid(filename);
+
+
+
+  // TODO: isDataValid for maximal simplex version.
+  bool valid = isValidSimplex(filename);
   if (!valid){
     std::cerr << filename << ": Invalid Data, please check its content." << std::endl;
     return 0;
   }
-  bool euler = isEuler(filename);
-  int numArrow = numberOfArrow(filename);
-  std::vector<std::array<int,2>> arrowList;
-  // int arrowList[numArrow][2];
-  makeArrowList(filename,arrowList);
-  std::vector<int> vertexList;
-  vertexSet(arrowList,numArrow,vertexList);
-  if (euler)
-    {
-      std::cout << "The poset is Euler! " << std::endl;
-    }
 
-  std::vector<std::vector<int>> maximalChains;
+  // TODO: isEuler for simplex version.
 
-  maximalChains = getMaximalChains(filename);
+  // maximalChains(maximalSimplex) is obteined directly from the data.
+
+  std::vector<std::vector<int>> maximalSimplexList = getMaximalSimplex(filename);
   std::vector<std::vector<int>> simpleces;
 
-  simpleces = getChainComplexGenerators(maximalChains);
+  simpleces = getChainComplexGenerators(maximalSimplexList);
+
+  // make vertexList and arrowsList from maximalSimplex this means 0-dim simplexList and 1-dim simplexList
+
+  // int numArrow = numberOfArrow(filename);
+
+  std::vector<int> vertexList;
+  std::vector<std::array<int,2>> arrowList;
+  makeVertexAndArrowList(simpleces,vertexList,arrowList);
+  int numberOfArrows = arrowList.size();
+  // vertexSet(arrowList,numArrow,vertexList);
+  bool euler = isEulerSimpComp(simpleces);
+  if (euler)
+    {
+      std::cout << "This is Euler. " << std::endl;
+    } else {
+    std::cout << "This is NOT Euler. " << std::endl;
+  }
+
 
   Z2matrix boundary = Z2matrix();
   boundary = makeBoundaryMatrix(simpleces);
@@ -112,7 +126,7 @@ int main(int argc,char *argv[])
     chain whitneyChianBefore = chain();
     for (int i = 0; i < dimention(simpleces); ++i)
       {
-        whitneyChianBefore.add(makeWhitneyChain(i,simpleces,vertexList,arrowList,numArrow));
+        whitneyChianBefore.add(makeWhitneyChain(i,simpleces,vertexList,arrowList,numberOfArrows));
       }
 
     Z2matrix c = Z2matrix();
